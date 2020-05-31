@@ -81,7 +81,7 @@ func forward(dst io.Writer, src io.Reader, selector string) error {
 			if err == io.EOF {
 				break
 			}
-			panic(err)
+			return err
 		}
 		fixed := fix(string(line), dir)
 		if _, err := dst.Write([]byte(fixed)); err != nil {
@@ -178,6 +178,7 @@ func main() {
 		conn, err := listener.Accept()
 		if err != nil {
 			log.Printf("failed to accept connection: %v", err)
+			continue
 		}
 		go handle(conn, sh)
 	}

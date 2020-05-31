@@ -124,6 +124,10 @@ func handledir(sh *shell.Shell, selector string, out io.Writer) error {
 		}
 	}
 
+	if _, err := out.Write([]byte(fix(".", ""))); err != nil {
+		return err
+	}
+
 	return nil
 }
 

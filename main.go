@@ -3,10 +3,12 @@ package main
 import (
 	"bufio"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"path"
+	"path/filepath"
 	"strings"
 
 	shell "github.com/ipfs/go-ipfs-api"
@@ -89,10 +91,49 @@ func forward(dst io.Writer, src io.Reader, selector string) error {
 	return nil
 }
 
+func handledir(sh *shell.Shell, selector string, out io.Writer) error {
+	dir, err := sh.List(selector)
+	if err != nil {
+		return err
+	}
+
+	if _, err := out.Write([]byte(fix(fmt.Sprintf("iListing %s", selector), ""))); err != nil {
+		return err
+	}
+	if _, err := out.Write([]byte(fix("i", ""))); err != nil {
+		return err
+	}
+
+	for _, entry := range dir {
+		path := path.Join(selector, entry.Name)
+		switch entry.Type {
+		case shell.TSymlink:
+			fallthrough
+		case shell.TRaw:
+			fallthrough
+		case shell.TFile:
+			_, err := out.Write([]byte(fix(fmt.Sprintf("%c%s\t%s", filetype(entry.Name), entry.Name, path), "")))
+			if err != nil {
+				return err
+			}
+		case shell.TDirectory:
+			_, err := out.Write([]byte(fix(fmt.Sprintf("1%s\t%s", entry.Name, path), "")))
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 func fetch(sh *shell.Shell, selector string, out io.Writer) error {
 	rc, err := sh.Cat(selector)
 	if err != nil {
-		return err
+		// This may be a directory. Error value in that case seems entirely
+		// dependent on the daemon implementation, so we just assume that it is
+		// and try fetching it as a directory instead of returning the error
+		return handledir(sh, selector, out)
 	}
 	defer rc.Close()
 	err = forward(out, rc, selector)
@@ -140,4 +181,22 @@ func main() {
 		}
 		go handle(conn, sh)
 	}
+}
+
+var filetypes = map[string]rune{
+	".txt": '0', ".gif": 'g', ".jpg": 'I', ".jpeg": 'I',
+	".png": 'I', ".html": 'h', ".htm": 'h', ".ogg": 's',
+	".mp3": 's', ".wav": 's', ".mod": 's', ".it": 's',
+	".xm": 's', ".mid": 's', ".vgm": 's', ".s": '0',
+	".c": '0', ".py": '0', ".h": '0', ".md": '0', ".go": '0',
+	".fs": '0', ".xml": '0', ".css": 0, ".ts": 0, ".svg": 'g',
+}
+
+func filetype(name string) rune {
+	fp, ok := filetypes[strings.ToLower(filepath.Ext(name))]
+	if !ok {
+		return '9'
+	}
+
+	return fp
 }

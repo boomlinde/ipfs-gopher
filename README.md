@@ -57,5 +57,4 @@ the preferred hostname and the port with the preferred port.
 TODO
 ----
 
--   Present IPFS directory objects as menus
 -   Report IPFS errors to client
